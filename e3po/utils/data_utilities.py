@@ -66,6 +66,7 @@ def generate_source_video(settings, ori_video_path, chunk_idx):
           f"-bf 0 " \
           f"-ss {h_1}:{m_1}:{s_1} " \
           f"-to {h_2}:{m_2}:{s_2} " \
+          f"-crf 30 " \
           f"-y {source_video_uri} " \
           f"-loglevel {ffmpeg_settings['loglevel']}"
     settings.logger.debug(cmd)
@@ -308,6 +309,46 @@ def segment_video(ffmpeg_settings, source_video_uri, dst_video_folder, segmentat
 
     os.system(cmd)
 
+def segment_video2(ffmpeg_settings, source_video_uri, dst_video_folder, segmentation_info):
+    """
+    Segment video tile from the original video
+
+    Parameters
+    ----------
+    ffmpeg_settings: dict
+        ffmpeg related information
+    source_video_uri: str
+        video uri of original video
+    dst_video_folder: str
+        folder path of the segmented video tile
+    segmentation_info: dict
+        tile information
+        
+    Returns
+    -------
+        None
+    """
+
+    out_w = segmentation_info['segment_out_info']['width']
+    out_h = segmentation_info['segment_out_info']['height']
+    start_w = segmentation_info['start_position']['width']
+    start_h = segmentation_info['start_position']['height']
+
+    result_frame_path = osp.join(dst_video_folder, f"%d.png")
+
+    
+    cmd = (
+        f"{ffmpeg_settings['ffmpeg_path']} "
+        f"-i {source_video_uri} "
+        f"-threads {ffmpeg_settings['thread']} "
+        f"-vf \"crop={out_w}:{out_h}:{start_w}:{start_h}\" "
+        #f"-c:v libx264 "
+        f"-b:v 30k "  # Set the desired bitrate, e.g., 1Mbps for reduced bitrate
+        #f"-crf 23 "  # Constant Rate Factor for quality control (lower is higher quality)
+        f"-q:v 2 -f image2 {result_frame_path} " \
+        f"-loglevel {ffmpeg_settings['loglevel']}"
+    )
+    os.system(cmd)
 
 def resize_video(ffmpeg_settings, source_video_uri, dst_video_folder, dst_video_info):
     """

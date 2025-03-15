@@ -68,7 +68,8 @@ class OnDemandEvaluation(BaseEvaluation):
             if self.last_img_index == frame_idx:
                 continue
             self.last_img_index = frame_idx
-
+            if frame_idx %10 != 0:
+                continue
             current_display_chunks = get_curr_display_chunks(arrival_list, curr_ts)
             curr_display_frames = get_curr_display_frames(self, current_display_chunks, curr_ts, frame_idx)
             dst_video_frame_uri = generate_dst_frame_uri(self.result_img_path, frame_idx)

@@ -1,0 +1,119 @@
+  
+    - GC_Score = Grand challenge score 
+    - cost = [w_1*total_bw, w_2*total_storage, w_3*total_calc] 
+to do:
+    - erp with every 10th frame
+    - various crf flags with upscale
+  #basic erp (default crf of 28) 
+   {
+    "AVG MSE": "22.723",
+    "AVG PSNR": "34.921dB",
+    "AVG SSIM": "0.941",
+    "AVG bandwidth": "22.232Mbps",
+    "Cost": "[0.0025760699999999997, 1.0201200000000001e-06, 0.0]",
+    "GC Score": "6.168693",
+    "MAX bandwidth": "37.267Mbps",
+    "Total transfer size": "28.623096MB"
+  }
+  
+ ##150k bitrate upscale
+  {
+    "AVG MSE": "1238.865",
+    "AVG PSNR": "17.311dB",
+    "AVG SSIM": "0.702",
+    "AVG bandwidth": "2.472Mbps",
+    "Cost": "[0.00028647, 1.21485e-07, 0.0]",
+    "GC Score": "0.13448",
+    "MAX bandwidth": "4.913Mbps",
+    "Total transfer size": "3.182862MB"
+  }
+
+##crf 28
+  {
+    "AVG MSE": "32.419",
+    "AVG PSNR": "33.272dB",
+    "AVG SSIM": "0.909",
+    "AVG bandwidth": "15.953Mbps",
+    "Cost": "[0.0018486, 7.368450000000001e-07, 0.0]",
+    "GC Score": "4.694673",
+    "MAX bandwidth": "25.433Mbps",
+    "Total transfer size": "20.539673MB"
+  }
+##crf 30 with lanzcos4 interpolation
+{
+"AVG MSE": "34.048",
+"AVG PSNR": "33.042dB",
+"AVG SSIM": "0.904",
+"AVG bandwidth": "15.953Mbps",
+"Cost": "[0.0018486, 7.368450000000001e-07, 0.0]",
+"GC Score": "4.488706",
+"MAX bandwidth": "25.433Mbps",
+"Total transfer size": "20.539673MB"
+}
+##crf 30 with inter cubic interpolation
+  {
+    "AVG MSE": "33.671",
+    "AVG PSNR": "33.098dB",
+    "AVG SSIM": "0.906",
+    "AVG bandwidth": "15.953Mbps",
+    "Cost": "[0.0018486, 7.368450000000001e-07, 0.0]",
+    "GC Score": "4.534749",
+    "MAX bandwidth": "25.433Mbps",
+    "Total transfer size": "20.539673MB"
+  }
+##downscale with lanzcos4 and then upscale with sr
+  {
+    "AVG MSE": "35.971",
+    "AVG PSNR": "32.849dB",
+    "AVG SSIM": "0.899",
+    "AVG bandwidth": "15.953Mbps",
+    "Cost": "[0.0018486, 7.368450000000001e-07, 0.0]",
+    "GC Score": "4.26768",
+    "MAX bandwidth": "25.433Mbps",
+    "Total transfer size": "20.539673MB"
+  }
+##with ssim improvement crf 30  
+  {
+    "AVG MSE": "18.232",
+    "AVG PSNR": "35.766dB",
+    "AVG SSIM": "0.953",
+    "AVG bandwidth": "15.953Mbps",
+    "Cost": "[0.0018486, 7.368450000000001e-07, 0.0]",
+    "GC Score": "7.819503",
+    "MAX bandwidth": "25.433Mbps",
+    "Total transfer size": "20.539673MB"
+  }
+##ssim improvement crf 40
+  {
+    "AVG MSE": "40.597",
+    "AVG PSNR": "32.329dB",
+    "AVG SSIM": "0.899",
+    "AVG bandwidth": "12.142Mbps",
+    "Cost": "[0.00140697, 5.385300000000001e-07, 0.0]",
+    "GC Score": "3.881128",
+    "MAX bandwidth": "19.2Mbps",
+    "Total transfer size": "15.633362MB"
+  }
+
+##ssim improvement crf 50
+  {
+    "AVG MSE": "173.067",
+    "AVG PSNR": "26.703dB",
+    "AVG SSIM": "0.76",
+    "AVG bandwidth": "8.714Mbps",
+    "Cost": "[0.0010098, 3.3849e-07, 0.0]",
+    "GC Score": "0.95374",
+    "MAX bandwidth": "12.282Mbps",
+    "Total transfer size": "11.219858MB"
+  }
+##ssim improvement crf 50 with finer parameter
+}
+     "AVG MSE": "167.021",
+    "AVG PSNR": "27.768dB",
+    "AVG SSIM": "0.768",
+    "AVG bandwidth": "8.714Mbps",
+    "Cost": "[0.0010098, 3.3849e-07, 0.0]",
+    "GC Score": "0.98792",
+    "MAX bandwidth": "12.282Mbps",
+    "Total transfer size": "11.219858MB"
+  } 

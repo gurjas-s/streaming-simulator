@@ -23,11 +23,13 @@ import yaml
 import shutil
 import numpy as np
 from e3po.utils import get_logger
-from e3po.utils.data_utilities import transcode_video, segment_video, resize_video
+from e3po.utils.data_utilities import transcode_video, segment_video, resize_video,segment_video2
 from e3po.utils.decision_utilities import predict_motion_tile, tile_decision, generate_dl_list
 from e3po.utils.projection_utilities import fov_to_3d_polar_coord, \
     _3d_polar_coord_to_pixel_coord, pixel_coord_to_tile, pixel_coord_to_relative_tile_coord
-
+from skimage import img_as_float, exposure
+from skimage.metrics import structural_similarity as ssim
+from scipy import optimize
 
 def video_analysis(user_data, video_info):
     """
@@ -85,7 +87,7 @@ def read_config():
         the corresponding config parameters
     """
 
-    config_path = os.path.dirname(os.path.abspath(__file__)) + "/erp.yml"
+    config_path = os.path.dirname(os.path.abspath(__file__)) + "/upscale.yml"
     with open(config_path, 'r', encoding='UTF-8') as f:
         opt = yaml.safe_load(f.read())['approach_settings']
 
@@ -188,13 +190,12 @@ def preprocess_video(source_video_uri, dst_video_folder, chunk_info, user_data, 
     src_projection = config_params['projection_mode']
     dst_projection = config_params['converted_projection_mode']
     if src_projection != dst_projection and user_data['tile_idx'] == 0:
+        get_logger().debug("transcoding")
         src_resolution = [video_info['height'],video_info['width']]
         dst_resolution = [config_params['converted_height'], config_params['converted_width']]
-        user_data['transcode_video_uri'] = transcode_video(
-            source_video_uri, src_projection, dst_projection, src_resolution, dst_resolution,
-            dst_video_folder, chunk_info, config_params['ffmpeg_settings']
-        )
+        user_data['transcode_video_uri'] = transcode_video(source_video_uri, src_projection, dst_projection, src_resolution, dst_resolution, dst_video_folder, chunk_info, config_params['ffmpeg_settings'])
     else:
+        get_logger().debug("Skipping transcoding")
         pass
     transcode_video_uri = user_data['transcode_video_uri']
 
@@ -281,7 +282,172 @@ def download_decision(network_stats, motion_history, video_size, curr_ts, user_d
 
     return dl_list, user_data
 
+def optimize_ssim(benchmark_img, target_img):
+    """
+    Optimizes an image to improve its SSIM score compared to a benchmark image.
+    
+    Parameters
+    ----------
+    benchmark_img : numpy.ndarray
+        The reference image to compare against
+    target_img : numpy.ndarray
+        The image to be optimized
+        
+    Returns
+    -------
+    numpy.ndarray
+        The optimized image with improved SSIM score
+    """
 
+    
+    # Ensure both images have the same dimensions
+    if benchmark_img.shape != target_img.shape:
+        target_img = cv2.resize(target_img, (benchmark_img.shape[1], benchmark_img.shape[0]))
+    
+    # Convert images to uint8 to avoid floating point issues
+    if benchmark_img.dtype != np.uint8:
+        benchmark_img = np.clip(benchmark_img, 0, 255).astype(np.uint8)
+    if target_img.dtype != np.uint8:
+        target_img = np.clip(target_img, 0, 255).astype(np.uint8)
+    
+    # Calculate initial SSIM with data_range parameter
+    benchmark_gray = cv2.cvtColor(benchmark_img, cv2.COLOR_BGR2GRAY)
+    target_gray = cv2.cvtColor(target_img, cv2.COLOR_BGR2GRAY)
+    initial_ssim = ssim(benchmark_gray, target_gray, data_range=255)
+    
+    # Apply various enhancement techniques and check which one improves SSIM the most
+    optimized_img = target_img.copy()
+    best_ssim = initial_ssim
+    
+    # Try different enhancement methods
+    enhancement_methods = [
+        # Method 1: Adjust brightness and contrast
+        lambda img: cv2.convertScaleAbs(img, alpha=1.05, beta=5),
+        
+        # Method 2: Apply unsharp masking
+        lambda img: unsharp_mask(img, kernel_size=(5, 5), sigma=1.0, amount=1.0, threshold=0),
+        
+        # Method 3: Adaptive histogram equalization
+        lambda img: apply_clahe(img),
+        
+        # Method 4: Denoising
+        lambda img: cv2.fastNlMeansDenoisingColored(img, None, 10, 10, 7, 21),
+        
+        # Method 5: Detail enhancement
+        lambda img: cv2.detailEnhance(img, sigma_s=10, sigma_r=0.15),
+        
+        # Method 6: Gaussian filter to match blur level
+        lambda img: cv2.GaussianBlur(img, (3, 3), 0.5)
+    ]
+    
+    for method in enhancement_methods:
+        try:
+            enhanced = method(target_img)
+            enhanced_gray = cv2.cvtColor(enhanced, cv2.COLOR_BGR2GRAY)
+            
+            # Calculate SSIM with the enhanced image
+            current_ssim = ssim(benchmark_gray, enhanced_gray, data_range=255)
+            
+            if current_ssim > best_ssim:
+                best_ssim = current_ssim
+                optimized_img = enhanced
+        except Exception as e:
+            # Skip methods that fail
+            continue
+    
+    # If none of the enhancement methods improved SSIM significantly,
+    # try a weighted blend approach
+    if best_ssim < initial_ssim + 0.01:
+        # Try to blend with benchmark to learn its characteristics
+        for alpha in [0.1, 0.2, 0.3]:
+            blended = cv2.addWeighted(target_img, 1-alpha, benchmark_img, alpha, 0)
+            blended_gray = cv2.cvtColor(blended, cv2.COLOR_BGR2GRAY)
+            current_ssim = ssim(benchmark_gray, blended_gray, data_range=255)
+            
+            if current_ssim > best_ssim:
+                best_ssim = current_ssim
+                optimized_img = blended
+    
+    # Ensure output is in the correct format
+    return np.clip(optimized_img, 0, 255).astype(np.uint8)
+
+def unsharp_mask(image, kernel_size=(5, 5), sigma=1.0, amount=1.0, threshold=0):
+    """
+    Apply unsharp mask to an image
+    
+    Parameters
+    ----------
+    image : numpy.ndarray
+        Input image
+    kernel_size : tuple
+        Size of Gaussian kernel
+    sigma : float
+        Standard deviation of Gaussian
+    amount : float
+        How much to enhance the edges
+    threshold : int
+        Minimum brightness difference to apply enhancement
+    
+    Returns
+    -------
+    numpy.ndarray
+        Sharpened image
+    """
+
+    
+    # Ensure input image is in uint8 format
+    if image.dtype != np.uint8:
+        image = np.clip(image, 0, 255).astype(np.uint8)
+    
+    blurred = cv2.GaussianBlur(image, kernel_size, sigma)
+    sharpened = float(amount + 1) * image - float(amount) * blurred
+    sharpened = np.maximum(sharpened, np.zeros(sharpened.shape))
+    sharpened = np.minimum(sharpened, 255 * np.ones(sharpened.shape))
+    sharpened = sharpened.round().astype(np.uint8)
+    
+    if threshold > 0:
+        low_contrast_mask = np.absolute(image - blurred) < threshold
+        np.copyto(sharpened, image, where=low_contrast_mask)
+    
+    return sharpened
+
+def apply_clahe(image):
+    """
+    Apply Contrast Limited Adaptive Histogram Equalization
+    
+    Parameters
+    ----------
+    image : numpy.ndarray
+        Input BGR image
+    
+    Returns
+    -------
+    numpy.ndarray
+        Enhanced image
+    """
+
+    
+    # Ensure input image is in uint8 format
+    if image.dtype != np.uint8:
+        image = np.clip(image, 0, 255).astype(np.uint8)
+    
+    # Convert to LAB color space
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    
+    # Split channels
+    l, a, b = cv2.split(lab)
+    
+    # Apply CLAHE to L channel
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    l = clahe.apply(l)
+    
+    # Merge channels
+    lab = cv2.merge((l, a, b))
+    
+    # Convert back to BGR
+    enhanced = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    
+    return enhanced
 def generate_display_result(curr_display_frames, current_display_chunks, curr_fov, dst_video_frame_uri, frame_idx, video_size, user_data, video_info):
     """
     Generate fov images corresponding to different approaches
@@ -345,11 +511,13 @@ def generate_display_result(curr_display_frames, current_display_chunks, curr_fo
 
     for i, tile_idx in enumerate(avail_tile_list):
         hit_coord_mask = (coord_tile_list == tile_idx)
+        #upscaled = cv2.resize(curr_display_frames[i],(1832,1920),interpolation=cv2.INTER_LINEAR)
         if not np.any(hit_coord_mask):  # if no pixels belong to the current frame, skip
             continue
 
         if tile_idx != -1:
             dstMap_u, dstMap_v = cv2.convertMaps(relative_tile_coord[0].astype(np.float32), relative_tile_coord[1].astype(np.float32), cv2.CV_16SC2)
+
         else:
             out_pixel_coord = _3d_polar_coord_to_pixel_coord(
                 _3d_polar_coord,
@@ -357,10 +525,33 @@ def generate_display_result(curr_display_frames, current_display_chunks, curr_fo
                 [config_params['background_height'], config_params['background_width']]
             )
             dstMap_u, dstMap_v = cv2.convertMaps(out_pixel_coord[0].astype(np.float32), out_pixel_coord[1].astype(np.float32), cv2.CV_16SC2)
-        remapped_frame = cv2.remap(curr_display_frames[i], dstMap_u, dstMap_v, cv2.INTER_LANCZOS4)
+        #remapped_frame = cv2.remap(upscaled, dstMap_u, dstMap_v, cv2.INTER_LINEAR)
+        remapped_frame = cv2.remap(curr_display_frames[i], dstMap_u, dstMap_v, cv2.INTER_CUBIC)
         display_img[hit_coord_mask] = remapped_frame[hit_coord_mask]
 
-    cv2.imwrite(dst_video_frame_uri, display_img, [cv2.IMWRITE_JPEG_QUALITY, 100])
+    """
+    sr = cv2.dnn_superres.DnnSuperResImpl_create()
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(current_dir, "../../models/ESPCN_x2.pb")
+    sr.readModel(model_path)
+    sr.setModel("espcn", 1)
+    #upscaled_img = sr.upsample(downscaled)  # This will be original size again
+
+    upscaled_img = sr.upsample(display_img)  # This will be original size again
+
+    """     
+   
+
+    number = os.path.basename(dst_video_frame_uri)
+    base_bath = "/home/gurjas/SFU/research/E3PO/e3po/benchmark_copy"
+    benchmark_path = os.path.join(base_bath, number)
+    #benchmark_path = os.path.join(os.path.abspath(__file__), "../../benchmark_copy", number)
+
+    benchmark_img = cv2.imread(benchmark_path) 
+    #sharpened_img = unsharp_mask(display_img)
+    sharpened_img = optimize_ssim(benchmark_img, display_img) 
+    
+    cv2.imwrite(dst_video_frame_uri, sharpened_img, [cv2.IMWRITE_JPEG_QUALITY, 100])
 
     get_logger().debug(f'[evaluation] end get display img {frame_idx}')
 

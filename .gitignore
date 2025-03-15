@@ -14,3 +14,4 @@ opensource_git_commit.log
 *.json
 api/
 pre-commit
+.venv
