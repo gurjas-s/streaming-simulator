@@ -56,6 +56,7 @@ def generate_source_video(settings, ori_video_path, chunk_idx):
     s_2 = str(((chunk_idx + 1) * chunk_duration) % 60).zfill(2)
     m_2 = str(((chunk_idx + 1) * chunk_duration) // 60).zfill(2)
     h_2 = str(((chunk_idx + 1) * chunk_duration) // 3600).zfill(2)
+#f"-crf 40 " \
 
     ffmpeg_settings = settings.ffmpeg_settings
     cmd = f"{ffmpeg_settings['ffmpeg_path']} " \
@@ -66,8 +67,7 @@ def generate_source_video(settings, ori_video_path, chunk_idx):
           f"-bf 0 " \
           f"-ss {h_1}:{m_1}:{s_1} " \
           f"-to {h_2}:{m_2}:{s_2} " \
-          f"-crf 30 " \
-          f"-y {source_video_uri} " \
+        f"-y {source_video_uri} " \
           f"-loglevel {ffmpeg_settings['loglevel']}"
     settings.logger.debug(cmd)
     os.system(cmd)

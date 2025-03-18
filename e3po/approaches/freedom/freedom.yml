@@ -4,7 +4,7 @@ approach_settings:
   video:
     tile_width_num: 1                         # number of horizontally segmented video tiles
     tile_height_num: 1                        # number of vertically segmented video tiles
-    vam_size: [1680, 1120]                    # resolution of the segmented frame
+    vam_size: [960, 916]                     # resolution of the segmented frame
     crop_factor: [ '7 / 32', '7 / 24' ]       # custom approach parameters
     scale_factors: { 1: '1', 1.5: '21 / 40', 2: '1 / 2', 3: '7 / 16', 4: '7 / 18', 5: '7 / 20', 6: '7 / 24', 7: '7 / 32' }    # custom approach parameters
   background:

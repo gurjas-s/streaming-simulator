@@ -25,7 +25,11 @@ from e3po.utils import get_logger
 from e3po.utils.projection_utilities import fov_to_3d_polar_coord
 from e3po.utils.json import get_tile_info
 
-
+sr = cv2.dnn_superres.DnnSuperResImpl_create()  
+current_dir = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.join(current_dir, "../../models/LapSRN_x2.pb")
+sr.readModel(model_path)
+sr.setModel("lapsrn", 2)
 def video_analysis(user_data, video_info):
     """
     This API allows users to analyze the full 360 video (if necessary) before the pre-processing starts.
@@ -186,8 +190,68 @@ def transcode_video(curr_video_frame, curr_frame_idx, network_stats, motion_hist
 
     return vam_frame, user_video_spec, user_data
 
-
 def generate_display_result(curr_display_frames, current_display_chunks, curr_fov, dst_video_frame_uri, frame_idx, video_size, user_data, video_info):
+    """
+    Generate the required fov images for the freedom approach
+    Parameters
+    ----------
+    curr_display_frames: list
+        current available video tile frames
+    current_display_chunks: list
+        current available video chunks
+    curr_fov: dict
+        current fov information, with format {"curr_motion", "range_fov", "fov_resolution"}
+    dst_video_frame_uri: str
+        the uri of generated fov frame
+    frame_idx: int
+        frame index of current display frame
+    video_size: dict
+        the video.json file generated after video preprocessing
+    user_data: dict
+        user related parameters and information
+    video_info: dict
+        video information for evaluation
+    Returns
+    -------
+    user_data: dict
+        updated user_data
+    """
+    if user_data is None or "video_info" not in user_data:
+        user_data = init_user(user_data, video_info)
+    client_fov = [float(curr_fov['curr_motion']['yaw']), float(curr_fov['curr_motion']['pitch']), 0]
+    frame_idx_temp = frame_idx
+    if frame_idx_temp > len(current_display_chunks) - 1:
+        frame_idx_temp = len(current_display_chunks) - 1
+    #print(curr_display_frames[0]) 
+    video_info['width'] *= 2 #change video sizes since we are upscaling the frames
+    video_info['height'] *= 2
+    server_fov = get_server_fov(video_size, frame_idx_temp)
+    
+    # Scale each frame in curr_display_frames by 2x
+    """
+    scaled_display_frames = []
+    for frame in curr_display_frames:
+        height, width = frame.shape[:2]
+        scaled_frame = cv2.resize(frame, (width*2, height*2), interpolation=cv2.INTER_CUBIC)
+        scaled_display_frames.append(scaled_frame)
+    """
+    scaled_frame = curr_display_frames[0]
+    height, width  = scaled_frame.shape[:2]  
+    print((height,width)) 
+    scaled_frame = cv2.resize(scaled_frame, (width*2,height*2),cv2.INTER_LINEAR)
+    # generate client image
+    _3d_polar_coord = fov_to_3d_polar_coord(client_fov, curr_fov['range_fov'], curr_fov['fov_resolution'])
+    coord_x_arr, coord_y_arr = _3d_polar_coord_to_pixel_coord(_3d_polar_coord, server_fov, user_data)
+    
+    # Use the scaled frames instead of the original ones
+    fov_result = generate_fov_img(scaled_frame, coord_x_arr, coord_y_arr)
+    
+    # write the calculated fov image into file
+    cv2.imwrite(dst_video_frame_uri, fov_result, [cv2.IMWRITE_JPEG_QUALITY, 100])
+    get_logger().debug(f'[evaluation] end get display img {frame_idx}')
+    return user_data
+
+def generate_display_result2(curr_display_frames, current_display_chunks, curr_fov, dst_video_frame_uri, frame_idx, video_size, user_data, video_info):
     """
     Generate the required fov images for the freedom approach
 
@@ -220,7 +284,7 @@ def generate_display_result(curr_display_frames, current_display_chunks, curr_fo
         user_data = init_user(user_data, video_info)
 
     client_fov = [float(curr_fov['curr_motion']['yaw']), float(curr_fov['curr_motion']['pitch']), 0]
-
+    
     frame_idx_temp = frame_idx
     if frame_idx_temp > len(current_display_chunks) - 1:
         frame_idx_temp = len(current_display_chunks) - 1

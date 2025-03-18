@@ -10,10 +10,10 @@ e3po_settings:
     video_fps: 30                         # video framerate, frames per second
     origin:
       video_dir: ~                        # relative path of the original video compared to './source/video'
-      video_name: release_video_1.mp4     # original video full name
+      video_name: output_2k.mp4     # original video full name
       projection_mode: erp                # equirectangular, projection format of original video
-      height: 3840                        # original video pixel width
-      width: 7680                         # original video pixel height
+      height: 1440                        # original video pixel width
+      width: 2560                         # original video pixel height
   encoding_params:                        # ------------------ The following are encoding settings ---------------- #
     encoder: libx264                      # encoder type in ffmpeg
     qp_list: [29]                         # qp value
@@ -41,7 +41,7 @@ e3po_settings:
     thread: 6                             # number of threads running ffmpeg
   metric:                                 # ------------------- The following are metirc settings ------------------- #
     range_fov: [ 89, 89 ]                 # fov range, [height,width] in degree
-    fov_resolution: [ 1920, 1832 ]        # fov resolution, [height, width]
+    fov_resolution: [ 1920, 1832]          # fov resolution, [height, width]
     psnr_flag: True                       # whether to calculate psnr. When (psnr_flag || ssim_flag) == True, the FoV video will be created and saved
     ssim_flag: True                       # whether to calculate ssim. When (psnr_flag || ssim_flag) == True, the FoV video will be created and saved
     psnr_ssim_frequency: 1                # the following condition needs to be met: (video_fps mod psnr_ssim_frequency) == 0

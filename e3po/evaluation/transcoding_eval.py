@@ -65,6 +65,8 @@ class TranscodingEvaluation(BaseEvaluation):
         for motion_ts in motion_clock:
             curr_ts = motion_ts + pre_downloading_duration
             frame_idx = int(motion_ts * self.video_fps // 1000.0)
+            if frame_idx%10!=0:
+                continue
             if self.last_img_index == frame_idx:
                 continue
             self.last_img_index = frame_idx

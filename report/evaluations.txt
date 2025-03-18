@@ -3,7 +3,8 @@
     - cost = [w_1*total_bw, w_2*total_storage, w_3*total_calc] 
 to do:
     - erp with every 10th frame
-    - various crf flags with upscale
+    - get 30 crf image 
+    - try lib 265
   #basic erp (default crf of 28) 
    {
     "AVG MSE": "22.723",
@@ -82,6 +83,7 @@ to do:
     "GC Score": "7.819503",
     "MAX bandwidth": "25.433Mbps",
     "Total transfer size": "20.539673MB"
+    bitrate: 1192 kb/s (ffmpeg)
   }
 ##ssim improvement crf 40
   {
@@ -93,6 +95,7 @@ to do:
     "GC Score": "3.881128",
     "MAX bandwidth": "19.2Mbps",
     "Total transfer size": "15.633362MB"
+    bitrate: 1273 kb/s (ffmpeg)
   }
 
 ##ssim improvement crf 50
@@ -116,4 +119,65 @@ to do:
     "GC Score": "0.98792",
     "MAX bandwidth": "12.282Mbps",
     "Total transfer size": "11.219858MB"
+  } 
+  
+ SR crf 30 resize down
+  {
+    "AVG MSE": "32.968",
+    "AVG PSNR": "33.195dB",
+    "AVG SSIM": "0.907",
+    "AVG bandwidth": "15.953Mbps",
+    "Cost": "[0.0018486, 7.368450000000001e-07, 0.0]",
+    "GC Score": "4.623179",
+    "MAX bandwidth": "25.433Mbps",
+    "Total transfer size": "20.539673MB"
+  }
+
+##SR crf 40 resize down
+
+{
+"AVG MSE": "79.13",
+"AVG PSNR": "29.696dB",
+"AVG SSIM": "0.794",
+"AVG bandwidth": "12.142Mbps",
+"Cost": "[0.00140697, 5.385300000000001e-07, 0.0]",
+"GC Score": "2.045596",
+"MAX bandwidth": "19.2Mbps",
+"Total transfer size": "15.633362MB"
+} 
+
+nothing crf 40
+  {
+    "AVG MSE": "79.515",
+    "AVG PSNR": "29.648dB",
+    "AVG SSIM": "0.793",
+    "AVG bandwidth": "12.142Mbps",
+    "Cost": "[0.00140697, 5.385300000000001e-07, 0.0]",
+    "GC Score": "2.035975",
+    "MAX bandwidth": "19.2Mbps",
+    "Total transfer size": "15.633362MB"
+  }
+
+##crf 40 downscale then upscale LapSRN x2
+  {
+    "AVG MSE": "78.044",
+    "AVG PSNR": "29.778dB",
+    "AVG SSIM": "0.796",
+    "AVG bandwidth": "12.142Mbps",
+    "Cost": "[0.00140697, 5.385300000000001e-07, 0.0]",
+    "GC Score": "2.07323",
+    "MAX bandwidth": "19.2Mbps",
+    "Total transfer size": "15.633362MB"
+  }
+
+  ##qb 35 then lapsrn x2 upscale from half fov
+   {
+    "AVG MSE": "34.112",
+    "AVG PSNR": "33.643dB",
+    "AVG SSIM": "0.892",
+    "AVG bandwidth": "9.534Mbps",
+    "Cost": "[0.0011047499999999998, 4.6215000000000005e-07, 0.0]",
+    "GC Score": "4.63555",
+    "MAX bandwidth": "15.965Mbps",
+    "Total transfer size": "12.274703MB"
   } 

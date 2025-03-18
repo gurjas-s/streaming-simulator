@@ -10,8 +10,8 @@ approach_settings:
     pw_size: 1                                # prediction window for predicting motion, in chunks
     converted:                                
       projection_mode: erp                    # converted projection format from the original erp video 
-      height: 3840                            # converted video height
-      width: 7680                             # converted video width
+      height: 3840                       # original video pixel width
+      width: 7680                         # original video pixel height
   background:                                 
     background_flag: True                     # whether to use background stream
     projection_mode: erp                      # projection mode of background stream

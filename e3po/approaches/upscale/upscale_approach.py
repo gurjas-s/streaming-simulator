@@ -27,10 +27,16 @@ from e3po.utils.data_utilities import transcode_video, segment_video, resize_vid
 from e3po.utils.decision_utilities import predict_motion_tile, tile_decision, generate_dl_list
 from e3po.utils.projection_utilities import fov_to_3d_polar_coord, \
     _3d_polar_coord_to_pixel_coord, pixel_coord_to_tile, pixel_coord_to_relative_tile_coord
-from skimage import img_as_float, exposure
+from skimage import img_as_float, exposure, color, data, restoration
 from skimage.metrics import structural_similarity as ssim
 from scipy import optimize
+from PIL import Image, ImageFilter
 
+sr = cv2.dnn_superres.DnnSuperResImpl_create()  
+current_dir = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.join(current_dir, "../../models/LapSRN_x8.pb")
+sr.readModel(model_path)
+sr.setModel("lapsrn", 8)
 def video_analysis(user_data, video_info):
     """
     This API allows users to analyze the full 360 video (if necessary) before the pre-processing starts.
@@ -448,6 +454,7 @@ def apply_clahe(image):
     enhanced = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
     
     return enhanced
+
 def generate_display_result(curr_display_frames, current_display_chunks, curr_fov, dst_video_frame_uri, frame_idx, video_size, user_data, video_info):
     """
     Generate fov images corresponding to different approaches
@@ -476,9 +483,9 @@ def generate_display_result(curr_display_frames, current_display_chunks, curr_fo
     user_data: dict
         updated user_data
     """
-
+    
     get_logger().debug(f'[evaluation] start get display img {frame_idx}')
-
+        
     if user_data is None or "video_info" not in user_data:
         user_data = init_user(user_data, video_info)
 
@@ -511,13 +518,11 @@ def generate_display_result(curr_display_frames, current_display_chunks, curr_fo
 
     for i, tile_idx in enumerate(avail_tile_list):
         hit_coord_mask = (coord_tile_list == tile_idx)
-        #upscaled = cv2.resize(curr_display_frames[i],(1832,1920),interpolation=cv2.INTER_LINEAR)
         if not np.any(hit_coord_mask):  # if no pixels belong to the current frame, skip
             continue
 
         if tile_idx != -1:
             dstMap_u, dstMap_v = cv2.convertMaps(relative_tile_coord[0].astype(np.float32), relative_tile_coord[1].astype(np.float32), cv2.CV_16SC2)
-
         else:
             out_pixel_coord = _3d_polar_coord_to_pixel_coord(
                 _3d_polar_coord,
@@ -525,23 +530,32 @@ def generate_display_result(curr_display_frames, current_display_chunks, curr_fo
                 [config_params['background_height'], config_params['background_width']]
             )
             dstMap_u, dstMap_v = cv2.convertMaps(out_pixel_coord[0].astype(np.float32), out_pixel_coord[1].astype(np.float32), cv2.CV_16SC2)
-        #remapped_frame = cv2.remap(upscaled, dstMap_u, dstMap_v, cv2.INTER_LINEAR)
-        remapped_frame = cv2.remap(curr_display_frames[i], dstMap_u, dstMap_v, cv2.INTER_CUBIC)
+        
+        remapped_frame = cv2.remap(curr_display_frames[i], dstMap_u, dstMap_v, cv2.INTER_LINEAR)
+       
         display_img[hit_coord_mask] = remapped_frame[hit_coord_mask]
+    
+      
 
-    """
-    sr = cv2.dnn_superres.DnnSuperResImpl_create()
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(current_dir, "../../models/ESPCN_x2.pb")
-    sr.readModel(model_path)
-    sr.setModel("espcn", 1)
-    #upscaled_img = sr.upsample(downscaled)  # This will be original size again
+    print("before upsampling")
+    scale = 2
+    #display_img = cv2.resize(display_img, (1832//scale,1920//scale), cv2.INTER_CUBIC) 
+    upscaled = sr.upsample(display_img) #upscale
+    print("after upsampling")  
+    height, width = upscaled.shape[:2]
+    print(f"Upscaled image dimensions: {width}x{height}") 
 
-    upscaled_img = sr.upsample(display_img)  # This will be original size again
-
-    """     
+ 
    
+    
+       
+    
+    # Downscale with high-quality interpolation
+    #final_img = cv2.resize(upscaled_img, (1832,1920), cv2.INTER_LANCZOS4)
 
+    
+    #upscaled_img = cv2.detailEnhance(upscaled_img, sigma_s=12, sigma_r=0.15)
+    """
     number = os.path.basename(dst_video_frame_uri)
     base_bath = "/home/gurjas/SFU/research/E3PO/e3po/benchmark_copy"
     benchmark_path = os.path.join(base_bath, number)
@@ -550,8 +564,13 @@ def generate_display_result(curr_display_frames, current_display_chunks, curr_fo
     benchmark_img = cv2.imread(benchmark_path) 
     #sharpened_img = unsharp_mask(display_img)
     sharpened_img = optimize_ssim(benchmark_img, display_img) 
+
+    """
+
+
+   # upscaled = cv2.resize(upscaled, (1832,1920), cv2.INTER_CUBIC) 
     
-    cv2.imwrite(dst_video_frame_uri, sharpened_img, [cv2.IMWRITE_JPEG_QUALITY, 100])
+    cv2.imwrite(dst_video_frame_uri, upscaled, [cv2.IMWRITE_JPEG_QUALITY, 100])
 
     get_logger().debug(f'[evaluation] end get display img {frame_idx}')
 
